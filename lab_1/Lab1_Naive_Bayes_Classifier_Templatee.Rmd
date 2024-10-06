@@ -48,7 +48,7 @@ library(ggplot2)
 library(wordcloud)
 library(RColorBrewer)
 library(dplyr)
-
+library(tidyr)
 ```
 
 ```{r}
@@ -256,7 +256,7 @@ naiveBayes <- setRefClass("naiveBayes",
            unseen_word_count = "numeric"         # Counter for unseen words in prediction
        ),
 
-       methods = list(=
+       methods = list(
                     fit = function(X, y)
                     {
                         training_data <- data.frame(text = X, label = y, stringsAsFactors = FALSE)
@@ -276,7 +276,7 @@ naiveBayes <- setRefClass("naiveBayes",
                             neutral = sum(training_data$label == "neutral")
                         )
                     
-                        smoothing_factor <- 1  # Laplace smoothing
+                        smoothing_factor <- 1 
                         total_vocab <- nrow(class_word_counts)
                     
                         if (!"discrim" %in% names(class_word_counts)) {
@@ -295,6 +295,7 @@ naiveBayes <- setRefClass("naiveBayes",
                             prob_neutral = (class_word_counts$neutral + smoothing_factor) / (total_neutral_words + smoothing_factor * total_vocab)
                         )
                     },
+
 
                     predict = function(message)
                     {
@@ -316,16 +317,17 @@ naiveBayes <- setRefClass("naiveBayes",
                                 unseen_word_count <<- unseen_word_count + 1
                             }
                         }
-                        
+                    
                         return(ifelse(log_prob_discrim > log_prob_neutral, "discrim", "neutral"))
                     },
+
 
                     score = function(X_test, y_test)
                     {
                         predictions <- sapply(X_test, function(sentence) {
                             predict(sentence)
                         })
-=
+
                         TP <- sum(predictions == "discrim" & y_test == "discrim")
                         TN <- sum(predictions == "neutral" & y_test == "neutral")
                         FP <- sum(predictions == "discrim" & y_test == "neutral")
@@ -335,7 +337,6 @@ naiveBayes <- setRefClass("naiveBayes",
                         recall <- TP / (TP + FN)
                         f1_score <- 2 * (precision * recall) / (precision + recall)
                         accuracy <- (TP + TN) / length(y_test)
-
                         
                         return(list(precision = precision, recall = recall, f1_score = f1_score, accuracy = accuracy))
                     }
