@@ -81,6 +81,9 @@ num_discrim_tweets
 ```
 
 ```{r}
+discrimination_tweets <- train %>%
+  filter(label == "discrim")
+
 all_discrim_words <- discrimination_tweets %>%
 unnest_tokens(word, tweet, token = "words") %>%
 filter(!word %in% splitted_stop_words) %>%
@@ -98,6 +101,9 @@ num_neutral_tweets
 ```
 
 ```{r}
+neutral_tweets <- train %>%
+  filter(label == "neutral")
+
 all_neutral_words <- neutral_tweets %>%
 unnest_tokens(word, tweet, token = "words") %>%
 filter(!word %in% splitted_stop_words) %>%
