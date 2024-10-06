@@ -137,15 +137,15 @@ word_counts <- neutral_words %>%
   arrange(desc(frequency))
 
 if (nrow(word_counts) > 0) {
-  top_words <- word_counts$splitted[1:10]
-  top_frequencies <- word_counts$frequency[1:10]
+  top_words <- word_counts$splitted[1:15]
+  top_frequencies <- word_counts$frequency[1:15]
   data_plot <- data.frame(top_words, top_frequencies)
-  palette <- heat.colors(10)
+  palette <- heat.colors(15)
  
   ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
     geom_col() +
     scale_fill_manual(values = palette) +
-    labs(title = "top 10 most frequent neutral words", x = "words", y = "count") +
+    labs(title = "top 15 most frequent neutral words", x = "words", y = "count") +
     theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
     theme_light()
 } 
@@ -158,15 +158,15 @@ word_counts <- discrim_words %>%
   arrange(desc(frequency))
 
 if (nrow(word_counts) > 0) {
-  top_words <- word_counts$splitted[1:10]
-  top_frequencies <- word_counts$frequency[1:10]
+  top_words <- word_counts$splitted[1:15]
+  top_frequencies <- word_counts$frequency[1:15]
   data_plot <- data.frame(top_words, top_frequencies)
-  palette <- heat.colors(10)
+  palette <- heat.colors(15)
  
   ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
     geom_col() +
     scale_fill_manual(values = palette) +
-    labs(title = "top 10 most frequent discrimination words", x = "words", y = "count") +
+    labs(title = "top 15 most frequent discrimination words", x = "words", y = "count") +
     theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
     theme_light()
 } 
