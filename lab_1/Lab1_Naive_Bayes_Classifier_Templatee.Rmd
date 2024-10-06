@@ -241,3 +241,110 @@ ggplot(categories, aes(x = "", y = count, fill = type)) +
   scale_fill_manual(values = c("discrimination" = "coral", "neutral" = "skyblue"))
 
 ```
+
+## Classifier implementation
+
+```{r}
+naiveBayes <- setRefClass("naiveBayes",
+
+       # Define fields to store intermediate results like frequency counts, probabilities, etc.
+       fields = list(
+           bag_of_words = "data.frame",          # Tokenized words and their counts
+           class_word_counts = "data.frame",     # Word counts per class
+           class_counts = "list",                # Number of instances for each class
+           word_probabilities = "data.frame",    # Word probabilities given a class
+           unseen_word_count = "numeric"         # Counter for unseen words in prediction
+       ),
+
+       methods = list(=
+                    fit = function(X, y)
+                    {
+                        training_data <- data.frame(text = X, label = y, stringsAsFactors = FALSE)
+                        
+                        unseen_word_count <<- 0
+                    
+                        bag_of_words <<- unnest_tokens(training_data, 'words', 'text', token = "words") %>%
+                                        filter(!words %in% splitted_stop_words & !grepl("\\d", words))
+                    
+                        class_word_counts <<- bag_of_words %>%
+                                              group_by(words, label) %>%
+                                              tally() %>%
+                                              pivot_wider(names_from = label, values_from = n, values_fill = 0)
+                    
+                        class_counts <<- list(
+                            discrim = sum(training_data$label == "discrim"),
+                            neutral = sum(training_data$label == "neutral")
+                        )
+                    
+                        smoothing_factor <- 1  # Laplace smoothing
+                        total_vocab <- nrow(class_word_counts)
+                    
+                        if (!"discrim" %in% names(class_word_counts)) {
+                            class_word_counts$discrim <<- 0
+                        }
+                        if (!"neutral" %in% names(class_word_counts)) {
+                            class_word_counts$neutral <<- 0
+                        }
+                    
+                        total_discrim_words <- sum(class_word_counts$discrim)
+                        total_neutral_words <- sum(class_word_counts$neutral)
+                    
+                        word_probabilities <<- data.frame(
+                            word = class_word_counts$words,
+                            prob_discrim = (class_word_counts$discrim + smoothing_factor) / (total_discrim_words + smoothing_factor * total_vocab),
+                            prob_neutral = (class_word_counts$neutral + smoothing_factor) / (total_neutral_words + smoothing_factor * total_vocab)
+                        )
+                    },
+
+                    predict = function(message)
+                    {
+                        message_df <- data.frame(text = message, stringsAsFactors = FALSE)
+                        
+                        message_tokens <- unnest_tokens(message_df, 'words', 'text', token = "words") %>%
+                                          filter(!words %in% splitted_stop_words & !grepl("\\d", words)) %>%
+                                          pull(words)
+                    
+                        log_prob_discrim <- log(class_counts$discrim / sum(unlist(class_counts)))
+                        log_prob_neutral <- log(class_counts$neutral / sum(unlist(class_counts)))
+                    
+                        for (word in message_tokens) {
+                            if (word %in% word_probabilities$word) {
+                                word_prob <- word_probabilities[word_probabilities$word == word, ]
+                                log_prob_discrim <- log_prob_discrim + log(word_prob$prob_discrim)
+                                log_prob_neutral <- log_prob_neutral + log(word_prob$prob_neutral)
+                            } else {
+                                unseen_word_count <<- unseen_word_count + 1
+                            }
+                        }
+                        
+                        return(ifelse(log_prob_discrim > log_prob_neutral, "discrim", "neutral"))
+                    },
+
+                    score = function(X_test, y_test)
+                    {
+                        predictions <- sapply(X_test, function(sentence) {
+                            predict(sentence)
+                        })
+=
+                        TP <- sum(predictions == "discrim" & y_test == "discrim")
+                        TN <- sum(predictions == "neutral" & y_test == "neutral")
+                        FP <- sum(predictions == "discrim" & y_test == "neutral")
+                        FN <- sum(predictions == "neutral" & y_test == "discrim")
+
+                        precision <- TP / (TP + FP)
+                        recall <- TP / (TP + FN)
+                        f1_score <- 2 * (precision * recall) / (precision + recall)
+                        accuracy <- (TP + TN) / length(y_test)
+
+                        
+                        return(list(precision = precision, recall = recall, f1_score = f1_score, accuracy = accuracy))
+                    }
+))
+
+# Example usage:
+model <- naiveBayes()
+model$fit(train$tweet, train$label)
+
+model$score(test$tweet, test$label)
+
+```
