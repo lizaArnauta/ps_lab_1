@@ -1,0 +1,190 @@
+---
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Probability and Statistics
+
+# Lab Assignment 1: Naive Bayes Classifier
+
+## Work breakdown
+
+-   *Name1 Surname1*: 
+-   *Name2 Surname2*: 
+-   *Name3 Surname3*: 
+
+## Introduction
+
+During the first three weeks, you learned a couple of essential notions
+and theorems, and one of the most important among them is the *Bayes
+theorem*.
+
+One of its applications is **Naive Bayes classifier**, which is a
+probabilistic classifier whose aim is to determine which class some
+observation probably belongs to by using the Bayes formula:
+$$\mathsf{P}(\mathrm{class}\mid \mathrm{observation})=\frac{\mathsf{P}(\mathrm{observation}\mid\mathrm{class})\mathsf{P}(\mathrm{class})}{\mathsf{P}(\mathrm{observation})}$$
+
+Under the strong independence assumption, one can calculate
+$\mathsf{P}(\mathrm{observation} \mid \mathrm{class})$ as
+$$\mathsf{P}(\mathrm{observation}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i), \qquad \mathsf{P}(\mathrm{observation} \mid \mathrm{class}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i \mid \mathrm{class}),$$
+where $n$ is the total number of features describing a given
+observation. Thus, $\mathsf{P}(\mathrm{class}|\mathrm{observation})$ now
+can be calculated as
+
+$$\mathsf{P}(\mathrm{class} \mid \mathrm{\mathrm{observation}}) = \mathsf{P}(\mathrm{class})\times \prod_{i=1}^{n}\frac{\mathsf{P}(\mathrm{feature}_i\mid \mathrm{class})}{\mathsf{P}(\mathrm{feature}_i)}\tag{1}$$
+
+
+## Data description
+
+```{r}
+library(tidytext)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(wordcloud)
+library(RColorBrewer)
+library(dplyr)
+
+```
+
+```{r}
+list.files(getwd())
+list.files("data/1-discrimination")
+```
+
+```{r}
+test_path <- "test.csv"
+train_path <- "train.csv"
+
+stop_words <- read_file("stop_words.txt")
+splitted_stop_words <- strsplit(stop_words, split='\n')
+splitted_stop_words <- splitted_stop_words[[1]]
+splitted_stop_words
+```
+
+```{r}
+train <-  read.csv(file = train_path, stringsAsFactors = FALSE)
+test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
+```
+
+```{r}
+num_discrim_tweets <- train %>%
+filter(label == "discrim") %>%
+nrow()
+
+num_discrim_tweets
+```
+
+```{r}
+all_discrim_words <- discrimination_tweets %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+nrow()
+
+all_discrim_words
+```
+
+```{r}
+num_neutral_tweets <- train %>%
+filter(label == "neutral") %>%
+nrow()
+
+num_neutral_tweets
+```
+
+```{r}
+all_neutral_words <- neutral_tweets %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+nrow()
+
+all_neutral_words
+```
+
+```{r}
+unique_words <- train %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+count(word, sort = TRUE) %>%
+nrow()
+
+unique_words
+```
+
+
+
+## Data visualization
+
+Each time you work with some data, you need to understand it before you
+start processing it. R has very powerful tools to make nice plots and
+visualization. Show what are the most common words for negative and
+positive examples as a histogram, word cloud etc. Be creative!
+
+```{r}
+word_counts <- neutral_words %>%
+  count(splitted, name = "frequency") %>%
+  arrange(desc(frequency))
+
+if (nrow(word_counts) > 0) {
+  top_words <- word_counts$splitted[1:10]
+  top_frequencies <- word_counts$frequency[1:10]
+  data_plot <- data.frame(top_words, top_frequencies)
+  palette <- heat.colors(10)
+ 
+  ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
+    geom_col() +
+    scale_fill_manual(values = palette) +
+    labs(title = "top 10 most frequent neutral words", x = "words", y = "count") +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    theme_light()
+} 
+
+```
+
+```{r}
+word_counts <- discrim_words %>%
+  count(splitted, name = "frequency") %>%
+  arrange(desc(frequency))
+
+if (nrow(word_counts) > 0) {
+  top_words <- word_counts$splitted[1:10]
+  top_frequencies <- word_counts$frequency[1:10]
+  data_plot <- data.frame(top_words, top_frequencies)
+  palette <- heat.colors(10)
+ 
+  ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
+    geom_col() +
+    scale_fill_manual(values = palette) +
+    labs(title = "top 10 most frequent discrimination words", x = "words", y = "count") +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    theme_light()
+} 
+
+```
+```{r}
+discrim_count <- num_discrim_tweets 
+neutral_count <- num_neutral_tweets 
+categories <- data.frame(
+  type = c("discrimination", "neutral"),
+  count = c(discrim_count, neutral_count)
+)
+
+categories$percentage <- round((categories$count / sum(categories$count)) * 100, 1)
+ggplot(categories, aes(x = "", y = count, fill = type)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") + 
+  geom_text(aes(label = paste(percentage, "%", sep = "")), 
+            position = position_stack(vjust = 0.5)) + 
+  labs(title = "distribution of discrimination and neutral words", fill = "type") +
+  theme_void() +
+  scale_fill_manual(values = c("discrimination" = "coral", "neutral" = "skyblue"))
+
+```
+
+
+
