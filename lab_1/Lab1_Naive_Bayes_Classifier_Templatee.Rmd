@@ -337,7 +337,10 @@ naiveBayes <- setRefClass("naiveBayes",
                         recall <- TP / (TP + FN)
                         f1_score <- 2 * (precision * recall) / (precision + recall)
                         accuracy <- (TP + TN) / length(y_test)
-                        
+
+                        cat("Number of correct 'discrim' predictions:", TP, " out of ", sum(y_test == "discrim"), "\n")
+                        cat("Number of correct 'neutral' predictions:", TN, " out of ", sum(y_test == "neutral"), "\n")
+
                         return(list(precision = precision, recall = recall, f1_score = f1_score, accuracy = accuracy))
                     }
 ))
