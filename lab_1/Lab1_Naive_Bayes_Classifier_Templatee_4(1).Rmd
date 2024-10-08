@@ -1,0 +1,418 @@
+---
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Probability and Statistics
+
+# Lab Assignment 1: Naive Bayes Classifier
+
+## Work breakdown
+
+-   *Name1 Surname1*:
+-   *Name2 Surname2*:
+-   *Name3 Surname3*:
+
+## Introduction
+
+During the first three weeks, you learned a couple of essential notions
+and theorems, and one of the most important among them is the *Bayes
+theorem*.
+
+One of its applications is **Naive Bayes classifier**, which is a
+probabilistic classifier whose aim is to determine which class some
+observation probably belongs to by using the Bayes formula:
+$$\mathsf{P}(\mathrm{class}\mid \mathrm{observation})=\frac{\mathsf{P}(\mathrm{observation}\mid\mathrm{class})\mathsf{P}(\mathrm{class})}{\mathsf{P}(\mathrm{observation})}$$
+
+Under the strong independence assumption, one can calculate
+$\mathsf{P}(\mathrm{observation} \mid \mathrm{class})$ as
+$$\mathsf{P}(\mathrm{observation}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i), \qquad \mathsf{P}(\mathrm{observation} \mid \mathrm{class}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i \mid \mathrm{class}),$$
+where $n$ is the total number of features describing a given
+observation. Thus, $\mathsf{P}(\mathrm{class}|\mathrm{observation})$ now
+can be calculated as
+
+$$\mathsf{P}(\mathrm{class} \mid \mathrm{\mathrm{observation}}) = \mathsf{P}(\mathrm{class})\times \prod_{i=1}^{n}\frac{\mathsf{P}(\mathrm{feature}_i\mid \mathrm{class})}{\mathsf{P}(\mathrm{feature}_i)}\tag{1}$$
+
+## Data description
+
+```{r}
+library(tidytext)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(wordcloud)
+library(RColorBrewer)
+library(dplyr)
+library(tidyr)
+```
+
+```{r}
+list.files(getwd())
+list.files("data/1-discrimination")
+```
+
+```{r}
+test_path <- "test.csv"
+train_path <- "train.csv"
+
+stop_words <- read_file("stop_words.txt")
+splitted_stop_words <- strsplit(stop_words, split='\n')
+splitted_stop_words <- splitted_stop_words[[1]]
+splitted_stop_words
+```
+
+```{r}
+train <-  read.csv(file = train_path, stringsAsFactors = FALSE)
+test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
+```
+
+```{r}
+num_discrim_tweets <- train %>%
+filter(label == "discrim") %>%
+nrow()
+
+num_discrim_tweets
+```
+
+```{r}
+discrimination_tweets <- train %>%
+  filter(label == "discrim")
+
+all_discrim_words <- discrimination_tweets %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+nrow()
+
+all_discrim_words
+```
+
+```{r}
+num_neutral_tweets <- train %>%
+filter(label == "neutral") %>%
+nrow()
+
+num_neutral_tweets
+```
+
+```{r}
+neutral_tweets <- train %>%
+  filter(label == "neutral")
+
+all_neutral_words <- neutral_tweets %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+nrow()
+
+all_neutral_words
+```
+
+```{r}
+unique_words <- train %>%
+unnest_tokens(word, tweet, token = "words") %>%
+filter(!word %in% splitted_stop_words) %>%
+count(word, sort = TRUE) %>%
+nrow()
+
+unique_words
+```
+
+## Data visualization
+
+Each time you work with some data, you need to understand it before you
+start processing it. R has very powerful tools to make nice plots and
+visualization. Show what are the most common words for negative and
+positive examples as a histogram, word cloud etc. Be creative!
+
+```{r}
+
+neutral_tweets <- train %>%
+  filter(label == "neutral")
+
+neutral_words <- neutral_tweets %>%
+  unnest_tokens(word, tweet, token = "words") %>%
+  filter(!word %in% splitted_stop_words)
+
+word_counts <- neutral_words %>%
+  count(word, name = "frequency") %>%
+  arrange(desc(frequency))
+
+if (nrow(word_counts) > 0) {
+  top_words <- word_counts$word[1:15]
+  top_frequencies <- word_counts$frequency[1:15]
+  data_plot <- data.frame(top_words, top_frequencies)
+  palette <- heat.colors(15)
+
+  ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
+    geom_col() +
+    scale_fill_manual(values = palette) +
+    labs(title = "Top 15 Most Frequent Neutral Words", x = "Words", y = "Count") +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    theme_light()
+}
+
+```
+
+```{r}
+
+discrimination_tweets <- train %>%
+  filter(label == "discrim")
+
+
+discrim_words <- discrimination_tweets %>%
+  unnest_tokens(word, tweet, token = "words") %>%
+  filter(!word %in% splitted_stop_words)
+
+
+word_counts <- discrim_words %>%
+  count(word, name = "frequency") %>%
+  arrange(desc(frequency))
+
+if (nrow(word_counts) > 0) {
+  top_words <- word_counts$word[1:15]
+  top_frequencies <- word_counts$frequency[1:15]
+  data_plot <- data.frame(top_words, top_frequencies)
+  palette <- heat.colors(15)
+
+  ggplot(data_plot, aes(x = top_words, y = top_frequencies, fill = top_words)) +
+    geom_col() +
+    scale_fill_manual(values = palette) +
+    labs(title = "Top 15 Most Frequent Discrimination Words", x = "Words", y = "Count") +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    theme_light()
+}
+
+```
+
+```{r}
+discrim_count <- num_discrim_tweets 
+neutral_count <- num_neutral_tweets 
+categories <- data.frame(
+  type = c("discrimination", "neutral"),
+  count = c(discrim_count, neutral_count)
+)
+
+categories$percentage <- round((categories$count / sum(categories$count)) * 100, 1)
+ggplot(categories, aes(x = "", y = count, fill = type)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") + 
+  geom_text(aes(label = paste(percentage, "%", sep = "")), 
+            position = position_stack(vjust = 0.5)) + 
+  labs(title = "distribution of discrimination and neutral words", fill = "type") +
+  theme_void() +
+  scale_fill_manual(values = c("discrimination" = "coral", "neutral" = "skyblue"))
+
+```
+
+## Classifier implementation
+
+```{r}
+naiveBayes <- setRefClass("naiveBayes",
+
+       # Define fields to store intermediate results like frequency counts, probabilities, etc.
+       fields = list(
+           bag_of_words = "data.frame",          # Tokenized words and their counts
+           class_word_counts = "data.frame",     # Word counts per class
+           class_counts = "list",                # Number of instances for each class
+           word_probabilities = "data.frame",    # Word probabilities given a class
+           unseen_word_count = "numeric"         # Counter for unseen words in prediction
+       ),
+
+       methods = list(
+                    fit = function(X, y)
+                    {
+                        training_data <- data.frame(text = X, label = y, stringsAsFactors = FALSE)
+                        
+                        unseen_word_count <<- 0
+                    
+                        bag_of_words <<- unnest_tokens(training_data, 'words', 'text', token = "words") %>%
+                                        filter(!words %in% splitted_stop_words & !grepl("\\d", words))
+                    
+                        class_word_counts <<- bag_of_words %>%
+                                              group_by(words, label) %>%
+                                              tally() %>%
+                                              pivot_wider(names_from = label, values_from = n, values_fill = 0)
+                    
+                        class_counts <<- list(
+                            discrim = sum(training_data$label == "discrim"),
+                            neutral = sum(training_data$label == "neutral")
+                        )
+                    
+                        smoothing_factor <- 1 
+                        total_vocab <- nrow(class_word_counts)
+                    
+                        if (!"discrim" %in% names(class_word_counts)) {
+                            class_word_counts$discrim <<- 0
+                        }
+                        if (!"neutral" %in% names(class_word_counts)) {
+                            class_word_counts$neutral <<- 0
+                        }
+                    
+                        total_discrim_words <- sum(class_word_counts$discrim)
+                        total_neutral_words <- sum(class_word_counts$neutral)
+                    
+                        word_probabilities <<- data.frame(
+                            word = class_word_counts$words,
+                            prob_discrim = (class_word_counts$discrim + smoothing_factor) / (total_discrim_words + smoothing_factor * total_vocab),
+                            prob_neutral = (class_word_counts$neutral + smoothing_factor) / (total_neutral_words + smoothing_factor * total_vocab)
+                        )
+                    },
+
+
+                    predict = function(message)
+                    {
+                        message_df <- data.frame(text = message, stringsAsFactors = FALSE)
+                        
+                        message_tokens <- unnest_tokens(message_df, 'words', 'text', token = "words") %>%
+                                          filter(!words %in% splitted_stop_words & !grepl("\\d", words)) %>%
+                                          pull(words)
+                    
+                        log_prob_discrim <- log(class_counts$discrim / sum(unlist(class_counts)))
+                        log_prob_neutral <- log(class_counts$neutral / sum(unlist(class_counts)))
+                    
+                        for (word in message_tokens) {
+                            if (word %in% word_probabilities$word) {
+                                word_prob <- word_probabilities[word_probabilities$word == word, ]
+                                log_prob_discrim <- log_prob_discrim + log(word_prob$prob_discrim)
+                                log_prob_neutral <- log_prob_neutral + log(word_prob$prob_neutral)
+                            } else {
+                                unseen_word_count <<- unseen_word_count + 1
+                            }
+                        }
+                    
+                        return(ifelse(log_prob_discrim > log_prob_neutral, "discrim", "neutral"))
+                    },
+
+
+                    score = function(X_test, y_test)
+                    {
+                        predictions <- sapply(X_test, function(sentence) {
+                            predict(sentence)
+                        })
+
+                        TP <- sum(predictions == "discrim" & y_test == "discrim")
+                        TN <- sum(predictions == "neutral" & y_test == "neutral")
+                        FP <- sum(predictions == "discrim" & y_test == "neutral")
+                        FN <- sum(predictions == "neutral" & y_test == "discrim")
+
+                        precision <- TP / (TP + FP)
+                        recall <- TP / (TP + FN)
+                        f1_score <- 2 * (precision * recall) / (precision + recall)
+                        accuracy <- (TP + TN) / length(y_test)
+                        
+                        return(list(precision = precision, recall = recall, f1_score = f1_score, accuracy = accuracy))
+                    }
+))
+
+# Example usage:
+model <- naiveBayes()
+model$fit(train$tweet, train$label)
+
+model$score(test$tweet, test$label)
+
+```
+
+```{r}
+
+result <- model$score(test$tweet, test$label)
+
+
+metrics_df <- data.frame(
+  Metric = c("Precision", "Recall", "F1 Score", "Accuracy"),
+  Value = c(result$precision, result$recall, result$f1_score, result$accuracy)  
+)
+
+
+ggplot(metrics_df, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = round(Value, 2)), vjust = -0.5) +  
+  theme_minimal() +
+  labs(title = "Classifier Performance Metrics",
+       x = "Metrics",
+       y = "Value") +
+  scale_fill_brewer(palette = "Set3")
+
+
+```
+
+```{r}
+
+predictions <- sapply(test$tweet, function(sentence) {
+    model$predict(sentence)
+})
+
+
+false_positives <- test[predictions == "discrim" & test$label == "neutral", ]
+false_negatives <- test[predictions == "neutral" & test$label == "discrim", ]
+
+
+failures <- data.frame(
+  Message = c(false_positives$tweet, false_negatives$tweet),
+  True_Label = c(rep("neutral", nrow(false_positives)), rep("discrim", nrow(false_negatives))),
+  Prediction = c(rep("discrim", nrow(false_positives)), rep("neutral", nrow(false_negatives)))
+)
+
+
+ggplot(failures, aes(x = Prediction, fill = True_Label)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Misclassified Messages",
+       x = "Predicted Label",
+       y = "Count",
+       fill = "True Label") +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+cat("False Positives (Predicted 'discrim', in fact 'neutral'):\n")
+print(false_positives$tweet)
+
+cat("\nFalse Negatives (Predicted 'neutral', in fact 'discrim'):\n")
+print(false_negatives$tweet)
+
+```
+
+## Conclusions
+
+Our team classified the data using a naive Bayesian classifier (required
+by the task). This method assumes that the features are independent of
+each other. This assumption allows us to calculate the probability of
+which class a particular tweet belongs to (in the case of our lab). This
+classifier uses Bayes' theorem (a formula that allows you to calculate
+the probability of event A, given that event B has occurred).
+
+$$\mathsf{P}(\mathrm{class} \mid \mathrm{\mathrm{observation}}) = \mathsf{P}(\mathrm{class})\times \prod_{i=1}^{n}\frac{\mathsf{P}(\mathrm{feature}_i\mid \mathrm{class})}{\mathsf{P}(\mathrm{feature}_i)}\tag{1}$$
+
+### Advantages of the method
+
+1.  Small sample size requirements, because due to the independence
+    assumption, we do not need a lot of data.
+2.  Easy to implement 3.Fast to work with, probabilities are calculated
+    immediately.
+
+### Disadvantages of the method
+
+1.  As we mentioned above, Bayesian classifier assumes that the features
+    are independent of each other. And in the case of sentence(tweets)
+    analysis, this is not always true, because there are certain
+    catchphrases, phrases, slang, dialects that can be recognized false
+    positive or false negative.
+
+2.  Zero probability problem.The problem is that when a word comes up
+    that was not in the training set, you can get a zero class
+    probability.
+
+### Accuracy is not a good choice
+
+In situation where one class occurs more often than another, the model
+can simply predict the class that occurs more often every time and the
+accuracy will be high. Instead, F1 takes into account accuracy and
+recall. This allows you to have balance between precision and recall. $$
+\mathsf{F1} = 2 \times \frac{\mathsf{Precision} \cdot \mathsf{Recall}}{\mathsf{Precision} + \mathsf{Recall}}
+$$
